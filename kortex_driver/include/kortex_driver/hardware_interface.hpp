@@ -197,6 +197,9 @@ private:
 
   // gripper stuff
   std::string gripper_joint_name_;
+  std::string gripper_model_;
+  double gripper_position_scale_HW_TO_URDF_ = 1.0;
+  double gripper_position_scale_URDF_TO_HW_ = 1.0;
   bool use_internal_bus_gripper_comm_;
 
   // temp variables to use in update loop

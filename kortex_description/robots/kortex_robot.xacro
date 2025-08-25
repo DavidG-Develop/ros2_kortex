@@ -56,6 +56,7 @@
       isaac_joint_commands="${isaac_joint_commands}"
       isaac_joint_states="${isaac_joint_states}"
       gripper_joint_name="${gripper_joint_name}"
+      gripper="${gripper}"
       gripper_max_velocity="${gripper_max_velocity}"
       gripper_max_force="${gripper_max_force}"
       use_external_cable="${use_external_cable}"

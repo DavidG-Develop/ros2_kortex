@@ -73,6 +73,7 @@ KortexMultiInterfaceHardware::KortexMultiInterfaceHardware()
   start_fault_controller_(false),
   first_pass_(true),
   gripper_joint_name_(""),
+  gripper_model_(""),
   use_internal_bus_gripper_comm_(false)
 {
   RCLCPP_INFO(LOGGER, "Setting severity threshold to DEBUG");
@@ -178,8 +179,17 @@ CallbackReturn KortexMultiInterfaceHardware::on_init(const hardware_interface::H
 
   gripper_command_max_velocity_ = std::stod(info_.hardware_parameters["gripper_max_velocity"]);
   gripper_command_max_force_ = std::stod(info_.hardware_parameters["gripper_max_force"]);
+  gripper_model_ = info_.hardware_parameters["gripper_model"];
 
   RCLCPP_INFO_STREAM(LOGGER, "Connecting to robot at " << robot_ip);
+
+  if (gripper_model_ == "robotiq_2f_140") {
+    RCLCPP_INFO(LOGGER, "Gripper model is robotiq_2f_140, using scale 0.695/0.7929");
+    gripper_position_scale_HW_TO_URDF_ = 0.695 / 0.7929;
+    gripper_position_scale_URDF_TO_HW_ = 0.7929 / 0.695;
+  } else {
+    RCLCPP_INFO(LOGGER, "Gripper model is %s, using scale 1.0", gripper_model_.c_str());
+  }
 
   // connections
   transport_tcp_.connect(robot_ip, port);
@@ -802,6 +812,7 @@ void KortexMultiInterfaceHardware::readGripperPosition()
   {
     gripper_position_ =
       feedback_.interconnect().gripper_feedback().motor()[0].position() / 100.0 * 0.81;  // rad
+    gripper_position_ = gripper_position_ * gripper_position_scale_HW_TO_URDF_; // add this to adapt to 140 gripper
   }
 }
 
@@ -985,6 +996,7 @@ void KortexMultiInterfaceHardware::sendGripperCommand(
   {
     try
     {
+      double scaled_position = position * gripper_position_scale_URDF_TO_HW_;
       if (arm_mode == k_api::Base::ServoingMode::SINGLE_LEVEL_SERVOING)
       {
         k_api::Base::GripperCommand gripper_command;
@@ -992,13 +1004,13 @@ void KortexMultiInterfaceHardware::sendGripperCommand(
         auto finger = gripper_command.mutable_gripper()->add_finger();
         finger->set_finger_identifier(1);
         finger->set_value(
-          static_cast<float>(position / 0.81));  // This values needs to be between 0 and 1
+          static_cast<float>(scaled_position / 0.81));  // This values needs to be between 0 and 1
         base_.SendGripperCommand(gripper_command);
       }
       else if (arm_mode == k_api::Base::ServoingMode::LOW_LEVEL_SERVOING)
       {
         // % open/closed, this values needs to be between 0 and 100
-        gripper_motor_command_->set_position(static_cast<float>(position / 0.81 * 100.0));
+        gripper_motor_command_->set_position(static_cast<float>(scaled_position / 0.81 * 100.0));
         // % gripper speed between 0 and 100 percent
         gripper_motor_command_->set_velocity(static_cast<float>(velocity));
         // % max force threshold, between 0 and 100
